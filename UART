@@ -1,0 +1,60 @@
+#define LEDMASK 0x0f
+#define FOSC 16000000UL// Clock Speed
+#define BAUD 9600
+#define MYUBRR FOSC/16/BAUD-1
+int LC = 0;
+int OVC = 0; //overflowcount
+
+void USART_Init(unsigned int ubrr)
+{
+UBRR0H = (unsigned char)(ubrr>>8);
+UBRR0L = (unsigned char)ubrr;
+UCSR0B = (1<<RXEN0)|(1<<TXEN0);
+UCSR0C = (1<<USBS0)|(3<<UCSZ00);
+}
+
+void setup() {
+  USART_Init(MYUBRR);
+  DDRB |= LEDMASK;
+  DDRD &= ~(0x04);
+  PORTD |= 0x04;
+  EIMSK |= (1<<INT0);
+  EICRA |= (1<<ISC01);
+
+  TCCR0A = 0;            //일반 모드
+  TCCR0B = (1 << CS02);  //분주비
+  TIMSK1 = (1 << TOIE1); //오버플로우
+}
+
+void UT(int i){ //transmit
+  while(!(UCSR0A & (1<<UDRE0)));
+  UDR0 = i;
+}
+
+void UTS(const char* i){ //using pointer
+  while (*i){
+    UT(*i++);
+  }
+}
+
+ISR(INT0_vect){
+  UTS("Fun Embedded System Design ");
+  TCNT0 = 0;
+  LC = 0;
+  PORTB &= ~LEDMASK;
+  PORTB |= (1 << LC);
+  OVC = 0;
+}
+
+ISR(TIMER1_OVF_vect){
+  OVC++;
+    if (OVC >= 61) {
+        if (LC < 4) {
+            PORTB |= (1 << LC);
+            LC++;
+        }
+        OVC = 0;
+    }
+}
+
+void loop() {}
